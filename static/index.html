@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Agent Opinion Simulator</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --text: #e2e8f0;
+    --text-muted: #8892a4;
+    --accent: #6c63ff;
+    --accent-hover: #7c73ff;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --you-bg: #1e293b;
+    --you-border: #334155;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  a { color: var(--accent); }
+
+  /* Layout */
+  .container { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { text-align: center; padding: 40px 0 32px; }
+  header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.5px; }
+  header p { color: var(--text-muted); margin-top: 6px; }
+
+  /* Section visibility */
+  .state-section { display: none; }
+  .state-section.active { display: block; }
+
+  /* Form elements */
+  label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  textarea, input[type=text], select {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius); padding: 10px 12px;
+    font-size: 14px; font-family: inherit; resize: vertical;
+    transition: border-color 0.2s;
+  }
+  textarea:focus, input[type=text]:focus, select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .char-count { font-size: 12px; color: var(--text-muted); text-align: right; margin-top: 3px; }
+  .char-count.warn { color: var(--yellow); }
+  .char-count.over { color: var(--red); }
+
+  .form-group { margin-bottom: 20px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+
+  /* Sliders */
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  input[type=range] {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; background: var(--border); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px;
+    background: var(--accent); border-radius: 50%; cursor: pointer;
+  }
+  .slider-val {
+    min-width: 36px; text-align: center; font-weight: 700;
+    color: var(--accent); font-size: 1rem;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 20px; border-radius: var(--radius); font-size: 14px;
+    font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 4px 10px; font-size: 12px; }
+  .btn-danger:hover { background: var(--red); color: #fff; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
+
+  /* Cost estimator */
+  .cost-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+    display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
+  }
+  .cost-item { display: flex; flex-direction: column; }
+  .cost-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.07em; }
+  .cost-value { font-size: 1.1rem; font-weight: 700; margin-top: 2px; }
+  .cost-green { color: var(--green); }
+  .cost-yellow { color: var(--yellow); }
+  .cost-red { color: var(--red); }
+
+  /* Agent cards */
+  .agents-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .agent-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
+    position: relative;
+  }
+  .agent-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .agent-num { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+  .agent-card input[type=text] { margin-bottom: 8px; }
+  .agent-remove { position: absolute; top: 12px; right: 12px; }
+
+  /* Feed */
+  #feed-container { display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
+  .feed-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    animation: slideIn 0.35s ease;
+  }
+  .feed-card.user-card {
+    background: var(--you-bg); border-color: var(--you-border);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .feed-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .agent-badge {
+    font-weight: 700; font-size: 13px;
+    padding: 2px 8px; border-radius: 4px;
+    background: rgba(255,255,255,0.07);
+  }
+  .round-badge {
+    font-size: 11px; color: var(--text-muted); background: var(--surface2);
+    padding: 2px 7px; border-radius: 4px;
+  }
+  .you-label {
+    font-weight: 700; font-size: 13px; color: #94a3b8;
+    padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.05);
+  }
+  .injection-label { font-size: 11px; color: #64748b; }
+  .feed-card p { font-size: 14px; line-height: 1.65; color: var(--text); }
+  .feed-card.user-card p { color: #cbd5e1; font-style: italic; }
+  .feed-time { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+  /* Progress */
+  .progress-bar-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; height: 8px; overflow: hidden; margin: 12px 0;
+  }
+  .progress-bar {
+    height: 100%; background: var(--accent);
+    border-radius: 6px; transition: width 0.4s ease;
+  }
+  .progress-label { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+  .status-indicator { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .dot.done { background: var(--green); animation: none; }
+
+  /* Injection bar */
+  .inject-bar {
+    background: var(--surface); border: 1px solid var(--you-border);
+    border-radius: var(--radius); padding: 14px 16px; margin-top: 16px;
+  }
+  .inject-bar label { color: #94a3b8; margin-bottom: 8px; }
+  .inject-row { display: flex; gap: 10px; align-items: flex-end; margin-top: 8px; }
+  .inject-row textarea { flex: 1; resize: none; height: 60px; }
+  .inject-feedback { font-size: 12px; color: var(--green); height: 16px; margin-top: 4px; }
+
+  /* Summary */
+  .summary-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px; margin-top: 24px;
+  }
+  .summary-box h3 { font-size: 1rem; margin-bottom: 14px; color: var(--text); }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .summary-agent {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .summary-agent-name { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .summary-agent-stat { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .summary-shift { font-size: 12px; line-height: 1.5; margin-top: 6px; color: var(--text); }
+  .shift-label { font-size: 10px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; }
+  .truncation-warn {
+    font-size: 12px; color: var(--yellow);
+    background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.2);
+    border-radius: 6px; padding: 8px 12px; margin-top: 10px;
+  }
+
+  /* Error */
+  .error-box {
+    background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3);
+    border-radius: var(--radius); padding: 20px 24px; margin-bottom: 24px;
+  }
+  .error-box h3 { color: var(--red); margin-bottom: 8px; }
+  .error-box p { font-size: 14px; color: var(--text); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 16px; }
+  .mt-16 { margin-top: 16px; }
+  .flex-end { display: flex; justify-content: flex-end; }
+  .new-sim-btn-wrap { text-align: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Multi-Agent Opinion Simulator</h1>
+    <p>Configure AI agents, paste an article, watch them debate in real time.</p>
+  </header>
+
+  <!-- ===== CONFIGURE STATE ===== -->
+  <section id="section-configure" class="state-section active">
+    <div class="form-group">
+      <label for="article-input">Article or Topic</label>
+      <textarea id="article-input" rows="7" maxlength="5000" placeholder="Paste a news article, topic, or prompt for the agents to debate..."></textarea>
+      <div class="char-count" id="article-count">0 / 5000</div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label for="model-select">Model</label>
+        <select id="model-select"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Agents <span id="agent-count-label">2</span></label>
+        <div class="slider-row">
+          <input type="range" id="agent-count-slider" min="2" max="50" value="5">
+          <span class="slider-val" id="agent-count-val">5</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Rounds <span id="rounds-label">3</span></label>
+        <div class="slider-row">
+          <input type="range" id="rounds-slider" min="1" max="20" value="3">
+          <span class="slider-val" id="rounds-val">3</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cost estimator -->
+    <div class="form-group">
+      <label>Estimated Cost</label>
+      <div class="cost-box">
+        <div class="cost-item">
+          <span class="cost-label">API Calls</span>
+          <span class="cost-value" id="est-calls">15</span>
+        </div>
+        <div class="cost-item">
+          <span class="cost-label">Est. Tokens</span>
+          <span class="cost-value" id="est-tokens">9,750</span>
+        </div>
+        <div class="cost-item">
+          <span class="cost-label">Est. Cost</span>
+          <span class="cost-value cost-green" id="est-cost">$0.0001</span>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Agent editor -->
+    <div class="agents-header">
+      <div class="section-title" style="margin-bottom:0">Agent Personalities</div>
+      <button class="btn btn-secondary btn-sm" onclick="App.addAgent()">+ Add Agent</button>
+    </div>
+    <div id="agents-container"></div>
+
+    <div class="flex-end mt-16">
+      <button class="btn btn-primary" id="run-btn" onclick="App.submit()">
+        ▶ Run Simulation
+      </button>
+    </div>
+  </section>
+
+  <!-- ===== LIVE FEED STATE ===== -->
+  <section id="section-live-feed" class="state-section">
+    <div class="status-indicator">
+      <div class="dot" id="status-dot"></div>
+      <span id="status-text">Simulation running...</span>
+    </div>
+    <div class="progress-label" id="round-label">Round 0 of 0</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+    </div>
+    <div id="truncation-warn" class="truncation-warn" style="display:none">
+      ⚠ Feed context is large — older messages are being summarized to stay within model limits.
+    </div>
+    <div id="feed-container"></div>
+
+    <!-- User injection bar -->
+    <div class="inject-bar" id="inject-bar" style="display:none">
+      <label>Join the Discussion</label>
+      <div id="inject-char-count" class="char-count">0 / 500</div>
+      <div class="inject-row">
+        <textarea id="inject-input" placeholder="Ask a question or throw in your perspective..." maxlength="500"></textarea>
+        <button class="btn btn-secondary" id="inject-btn" onclick="App.sendInjection()">Send</button>
+      </div>
+      <div class="inject-feedback" id="inject-feedback"></div>
+    </div>
+
+    <div id="summary-section" style="display:none"></div>
+
+    <div class="new-sim-btn-wrap">
+      <button class="btn btn-secondary" onclick="App.reset()">← New Simulation</button>
+    </div>
+  </section>
+
+  <!-- ===== ERROR STATE ===== -->
+  <section id="section-error" class="state-section">
+    <div class="error-box">
+      <h3>Something went wrong</h3>
+      <p id="error-message"></p>
+    </div>
+    <button class="btn btn-secondary" onclick="App.reset()">← Start Over</button>
+  </section>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Constants & helpers
+// ---------------------------------------------------------------------------
+const AVG_INPUT_TOKENS = 500;
+const AVG_OUTPUT_TOKENS = 150;
+
+let MODELS_CACHE = [];
+
+function agentColor(name) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 65%, 55%)`;
+}
+
+function fmtTime(ts) {
+  return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function fmtNum(n) {
+  return n.toLocaleString();
+}
+
+function humanError(resp, body) {
+  if (resp.status === 429) return body.detail || 'Rate limit exceeded. Please wait a few minutes before starting another simulation.';
+  if (resp.status === 400) return body.detail || 'Your input contains disallowed content. Please review and try again.';
+  if (resp.status === 422) return body.detail || 'Validation error: ' + JSON.stringify(body);
+  if (resp.status === 403) return 'Access denied. You can only view your own simulations.';
+  if (resp.status === 404) return 'Simulation not found.';
+  if (resp.status === 409) return 'The simulation is no longer running — it cannot accept messages.';
+  return body.detail || `Unexpected error (HTTP ${resp.status}).`;
+}
+
+// ---------------------------------------------------------------------------
+// Default agent personalities
+// ---------------------------------------------------------------------------
+const DEFAULT_AGENTS = [
+  {
+    name: 'The Skeptic',
+    system_prompt: 'You are a critical thinker who questions every claim. You demand evidence, point out logical fallacies, and distrust media narratives. Respond concisely and challenge others\' assumptions directly. Max 80 words.',
+  },
+  {
+    name: 'The Idealist',
+    system_prompt: 'You are an optimistic progressive who believes systemic change is possible. You emphasize human dignity, collective action, and long-term vision over short-term pragmatism. Respond with passion and hope. Max 80 words.',
+  },
+  {
+    name: 'The Pragmatist',
+    system_prompt: 'You are a results-driven centrist focused on what is achievable. You avoid ideology, look for compromise, cite cost-benefit tradeoffs, and distrust extremes on both sides. Respond calmly and practically. Max 80 words.',
+  },
+  {
+    name: 'The Traditionalist',
+    system_prompt: 'You are a conservative who values stability, proven institutions, and gradual change. You are skeptical of rapid reforms and believe cultural continuity matters. Respond respectfully but firmly in defense of established norms. Max 80 words.',
+  },
+  {
+    name: 'The Analyst',
+    system_prompt: 'You are a data-driven policy analyst. You cite statistics, compare international precedents, and break issues into components. You are neutral in tone but precise. Avoid emotional language; stick to evidence. Max 80 words.',
+  },
+];
+
+// ---------------------------------------------------------------------------
+// App state machine
+// ---------------------------------------------------------------------------
+const App = {
+  state: 'configure',
+  simulationId: null,
+  pollInterval: null,
+  lastRenderedIndex: 0,
+  agentColorMap: new Map(),
+  agents: [],          // list of {name, system_prompt}
+  isPaused: false,     // visibility API pause
+
+  // ---- Initialise ----
+  async init() {
+    try {
+      const res = await fetch('/models');
+      MODELS_CACHE = await res.json();
+      const sel = document.getElementById('model-select');
+      MODELS_CACHE.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.display_name}  ($${m.input_price_per_million}/M in · $${m.output_price_per_million}/M out)`;
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      console.error('Failed to load models:', e);
+    }
+
+    // Pre-populate default agents
+    DEFAULT_AGENTS.forEach(a => this.agents.push({ ...a }));
+    this.renderAgentCards();
+    this.updateCost();
+
+    // Wire up listeners
+    document.getElementById('article-input').addEventListener('input', () => {
+      const v = document.getElementById('article-input').value.length;
+      const el = document.getElementById('article-count');
+      el.textContent = `${v} / 5000`;
+      el.className = 'char-count' + (v > 4500 ? (v >= 5000 ? ' over' : ' warn') : '');
+    });
+
+    document.getElementById('agent-count-slider').addEventListener('input', e => {
+      const n = parseInt(e.target.value);
+      document.getElementById('agent-count-val').textContent = n;
+      this.syncAgentCount(n);
+      this.updateCost();
+    });
+
+    document.getElementById('rounds-slider').addEventListener('input', e => {
+      const n = parseInt(e.target.value);
+      document.getElementById('rounds-val').textContent = n;
+      this.updateCost();
+    });
+
+    document.getElementById('model-select').addEventListener('change', () => this.updateCost());
+
+    document.getElementById('inject-input').addEventListener('input', e => {
+      const v = e.target.value.length;
+      const el = document.getElementById('inject-char-count');
+      el.textContent = `${v} / 500`;
+      el.className = 'char-count' + (v > 400 ? (v >= 500 ? ' over' : ' warn') : '');
+    });
+
+    // Visibility API
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.isPaused = true;
+      } else {
+        this.isPaused = false;
+      }
+    });
+  },
+
+  // ---- State transitions ----
+  transition(newState, payload = {}) {
+    this.state = newState;
+    document.querySelectorAll('.state-section').forEach(el => el.classList.remove('active'));
+    document.getElementById(`section-${newState}`).classList.add('active');
+    if (newState === 'live_feed') this.onLiveFeed(payload);
+    if (newState === 'error') this.onError(payload);
+  },
+
+  onLiveFeed({ simulationId }) {
+    this.simulationId = simulationId;
+    this.lastRenderedIndex = 0;
+    this.agentColorMap.clear();
+    document.getElementById('feed-container').innerHTML = '';
+    document.getElementById('summary-section').style.display = 'none';
+    document.getElementById('summary-section').innerHTML = '';
+    document.getElementById('inject-bar').style.display = 'block';
+    document.getElementById('inject-input').value = '';
+    document.getElementById('inject-feedback').textContent = '';
+    document.getElementById('inject-char-count').textContent = '0 / 500';
+    document.getElementById('status-dot').className = 'dot';
+    document.getElementById('status-text').textContent = 'Simulation running...';
+    document.getElementById('truncation-warn').style.display = 'none';
+    this.startPolling();
+  },
+
+  onError({ message }) {
+    document.getElementById('error-message').textContent = message || 'An unknown error occurred.';
+  },
+
+  reset() {
+    this.stopPolling();
+    this.simulationId = null;
+    this.lastRenderedIndex = 0;
+    this.agentColorMap.clear();
+    this.transition('configure');
+  },
+
+  // ---- Agent editor ----
+  syncAgentCount(n) {
+    while (this.agents.length < n) {
+      this.agents.push({ name: `Agent ${this.agents.length + 1}`, system_prompt: '' });
+    }
+    if (this.agents.length > n) this.agents = this.agents.slice(0, n);
+    this.renderAgentCards();
+  },
+
+  renderAgentCards() {
+    const container = document.getElementById('agents-container');
+    container.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    this.agents.forEach((agent, i) => {
+      const card = document.createElement('div');
+      card.className = 'agent-card';
+      card.innerHTML = `
+        <div class="agent-card-header">
+          <span class="agent-num">Agent ${i + 1}</span>
+        </div>
+        ${this.agents.length > 2 ? `<button class="btn btn-danger agent-remove" onclick="App.removeAgent(${i})" title="Remove">✕</button>` : ''}
+        <input type="text" placeholder="Agent name" value="${escHtml(agent.name)}" maxlength="50"
+          oninput="App.agents[${i}].name = this.value; App.updateCost();">
+        <textarea rows="2" placeholder="Personality / system prompt (max 500 chars)" maxlength="500"
+          oninput="App.agents[${i}].system_prompt = this.value;">${escHtml(agent.system_prompt)}</textarea>
+      `;
+      frag.appendChild(card);
+    });
+    container.appendChild(frag);
+    // Sync slider
+    const slider = document.getElementById('agent-count-slider');
+    slider.value = this.agents.length;
+    document.getElementById('agent-count-val').textContent = this.agents.length;
+    this.updateCost();
+  },
+
+  addAgent() {
+    if (this.agents.length >= 50) return;
+    this.agents.push({ name: `Agent ${this.agents.length + 1}`, system_prompt: '' });
+    this.renderAgentCards();
+    // scroll to new card
+    const container = document.getElementById('agents-container');
+    container.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  },
+
+  removeAgent(i) {
+    if (this.agents.length <= 2) return;
+    this.agents.splice(i, 1);
+    this.renderAgentCards();
+  },
+
+  // ---- Cost estimator ----
+  updateCost() {
+    const agents = this.agents.length;
+    const rounds = parseInt(document.getElementById('rounds-slider').value) || 1;
+    const modelId = document.getElementById('model-select').value;
+    const model = MODELS_CACHE.find(m => m.id === modelId);
+    if (!model) return;
+
+    const totalCalls = agents * rounds;
+    const inputCost  = totalCalls * (AVG_INPUT_TOKENS  / 1e6) * model.input_price_per_million;
+    const outputCost = totalCalls * (AVG_OUTPUT_TOKENS / 1e6) * model.output_price_per_million;
+    const cost = inputCost + outputCost;
+    const totalTokens = totalCalls * (AVG_INPUT_TOKENS + AVG_OUTPUT_TOKENS);
+
+    document.getElementById('est-calls').textContent = fmtNum(totalCalls);
+    document.getElementById('est-tokens').textContent = fmtNum(totalTokens);
+
+    const costEl = document.getElementById('est-cost');
+    costEl.textContent = cost < 0.01 ? `$${cost.toFixed(5)}` : `$${cost.toFixed(4)}`;
+    costEl.className = 'cost-value ' + (cost < 0.05 ? 'cost-green' : cost < 0.50 ? 'cost-yellow' : 'cost-red');
+  },
+
+  // ---- Submit ----
+  async submit() {
+    const article = document.getElementById('article-input').value.trim();
+    if (!article) { alert('Please paste an article or topic.'); return; }
+    if (article.length > 5000) { alert('Article exceeds 5000 characters.'); return; }
+
+    const model_id = document.getElementById('model-select').value;
+    if (!model_id) { alert('Please select a model.'); return; }
+
+    const rounds = parseInt(document.getElementById('rounds-slider').value);
+    const agentsPayload = this.agents.map(a => ({ name: a.name.trim(), system_prompt: a.system_prompt.trim() }));
+    for (const a of agentsPayload) {
+      if (!a.name) { alert('All agents must have a name.'); return; }
+    }
+
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+
+    try {
+      const res = await fetch('/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article, model_id, agents: agentsPayload, rounds }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        this.transition('error', { message: humanError(res, body) });
+        return;
+      }
+      this.transition('live_feed', { simulationId: body.simulation_id });
+    } catch (e) {
+      this.transition('error', { message: 'Could not reach the server. Is the backend running?' });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Run Simulation';
+    }
+  },
+
+  // ---- Polling ----
+  startPolling() {
+    this.stopPolling();
+    this.pollInterval = setInterval(() => { if (!this.isPaused) this.poll(); }, 2000);
+    this.poll(); // immediate first poll
+  },
+
+  stopPolling() {
+    if (this.pollInterval) { clearInterval(this.pollInterval); this.pollInterval = null; }
+  },
+
+  async poll() {
+    if (!this.simulationId) return;
+    try {
+      const res = await fetch(`/status/${this.simulationId}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        this.stopPolling();
+        document.getElementById('inject-bar').style.display = 'none';
+        if (res.status === 403) {
+          this.transition('error', { message: 'Access denied — IP mismatch.' });
+        } else {
+          this.transition('error', { message: humanError(res, body) });
+        }
+        return;
+      }
+      const data = await res.json();
+      this.renderFeed(data);
+
+      if (data.context_truncated) {
+        document.getElementById('truncation-warn').style.display = 'block';
+      }
+
+      if (data.status === 'complete') {
+        this.stopPolling();
+        document.getElementById('inject-bar').style.display = 'none';
+        document.getElementById('status-dot').className = 'dot done';
+        document.getElementById('status-text').textContent = 'Simulation complete.';
+        this.updateProgress(data.total_rounds, data.total_rounds);
+        this.renderSummary(data);
+      } else if (data.status === 'error') {
+        this.stopPolling();
+        document.getElementById('inject-bar').style.display = 'none';
+        document.getElementById('status-dot').className = 'dot';
+        document.getElementById('status-dot').style.background = 'var(--red)';
+        document.getElementById('status-text').textContent = 'Simulation encountered an error.';
+        if (data.error_message) {
+          const errDiv = document.createElement('div');
+          errDiv.className = 'error-box';
+          errDiv.style.marginTop = '16px';
+          errDiv.innerHTML = `<h3>Error</h3><p>${escHtml(data.error_message)}</p>`;
+          document.getElementById('feed-container').appendChild(errDiv);
+        }
+      } else {
+        // still running
+        this.updateProgress(data.current_round, data.total_rounds);
+      }
+    } catch (e) {
+      // network error — don't stop polling, just skip this tick
+      console.warn('Poll error:', e);
+    }
+  },
+
+  updateProgress(current, total) {
+    document.getElementById('round-label').textContent = `Round ${current} of ${total}`;
+    const pct = total > 0 ? (current / total) * 100 : 0;
+    document.getElementById('progress-bar').style.width = `${pct}%`;
+  },
+
+  renderFeed(data) {
+    const container = document.getElementById('feed-container');
+    const newEntries = data.feed.slice(this.lastRenderedIndex);
+    if (newEntries.length === 0) return;
+
+    const frag = document.createDocumentFragment();
+    newEntries.forEach(entry => {
+      const card = document.createElement('div');
+      if (entry.is_user_injection) {
+        card.className = 'feed-card user-card';
+        card.innerHTML = `
+          <div class="feed-card-header">
+            <span class="you-label">You</span>
+            <span class="injection-label">joined the discussion · Round ${entry.round_number}</span>
+          </div>
+          <p>${escHtml(entry.content)}</p>
+          <div class="feed-time">${fmtTime(entry.timestamp)}</div>
+        `;
+      } else {
+        if (!this.agentColorMap.has(entry.agent_name)) {
+          this.agentColorMap.set(entry.agent_name, agentColor(entry.agent_name));
+        }
+        const color = this.agentColorMap.get(entry.agent_name);
+        card.className = 'feed-card';
+        card.innerHTML = `
+          <div class="feed-card-header">
+            <span class="agent-badge" style="color:${color}">${escHtml(entry.agent_name)}</span>
+            <span class="round-badge">Round ${entry.round_number}</span>
+          </div>
+          <p>${escHtml(entry.content)}</p>
+          <div class="feed-time">${fmtTime(entry.timestamp)}</div>
+        `;
+      }
+      frag.appendChild(card);
+    });
+    container.appendChild(frag);
+    this.lastRenderedIndex = data.feed.length;
+
+    // Scroll last card into view
+    container.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Update progress from feed
+    if (data.current_round > 0) {
+      this.updateProgress(data.current_round, data.total_rounds);
+    }
+  },
+
+  renderSummary(data) {
+    const section = document.getElementById('summary-section');
+    if (!data.feed || data.feed.length === 0) return;
+
+    // Per-agent stats
+    const agentStats = new Map();
+    data.feed.forEach(entry => {
+      if (entry.is_user_injection) return;
+      if (!agentStats.has(entry.agent_name)) {
+        agentStats.set(entry.agent_name, { posts: [], wordCount: 0 });
+      }
+      const stats = agentStats.get(entry.agent_name);
+      stats.posts.push(entry.content);
+      stats.wordCount += entry.content.split(/\s+/).filter(Boolean).length;
+    });
+
+    // Most words
+    let topAgent = '';
+    let topWords = 0;
+    agentStats.forEach((stats, name) => {
+      if (stats.wordCount > topWords) { topWords = stats.wordCount; topAgent = name; }
+    });
+
+    let html = `<div class="summary-box">
+      <h3>Simulation Summary</h3>`;
+
+    if (topAgent) {
+      const color = this.agentColorMap.get(topAgent) || agentColor(topAgent);
+      html += `<p style="margin-bottom:14px; font-size:13px; color:var(--text-muted)">
+        Most vocal: <strong style="color:${color}">${escHtml(topAgent)}</strong> — ${topWords} words total
+      </p>`;
+    }
+
+    html += `<div class="summary-grid">`;
+    agentStats.forEach((stats, name) => {
+      const color = this.agentColorMap.get(name) || agentColor(name);
+      const first = stats.posts[0] || '';
+      const last  = stats.posts[stats.posts.length - 1] || '';
+      const firstSnip = first.split(/\s+/).slice(0, 12).join(' ') + (first.split(/\s+/).length > 12 ? '…' : '');
+      const lastSnip  = last.split(/\s+/).slice(0, 12).join(' ')  + (last.split(/\s+/).length  > 12 ? '…' : '');
+      html += `<div class="summary-agent">
+        <div class="summary-agent-name" style="color:${color}">${escHtml(name)}</div>
+        <div class="summary-agent-stat">${stats.posts.length} posts · ${stats.wordCount} words</div>
+        ${stats.posts.length > 1 ? `
+        <div class="summary-shift">
+          <div class="shift-label">First</div>${escHtml(firstSnip)}
+          <div class="shift-label" style="margin-top:6px">Last</div>${escHtml(lastSnip)}
+        </div>` : ''}
+      </div>`;
+    });
+    html += `</div></div>`;
+
+    section.innerHTML = html;
+    section.style.display = 'block';
+    section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  },
+
+  // ---- User injection ----
+  async sendInjection() {
+    const input = document.getElementById('inject-input');
+    const message = input.value.trim();
+    if (!message) return;
+    if (message.length > 500) { alert('Message exceeds 500 characters.'); return; }
+
+    const btn = document.getElementById('inject-btn');
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    try {
+      const res = await fetch(`/inject/${this.simulationId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const fb = document.getElementById('inject-feedback');
+        fb.style.color = 'var(--red)';
+        fb.textContent = humanError(res, body);
+        setTimeout(() => { fb.textContent = ''; fb.style.color = 'var(--green)'; }, 3000);
+        return;
+      }
+      // Optimistic render
+      const container = document.getElementById('feed-container');
+      const card = document.createElement('div');
+      card.className = 'feed-card user-card';
+      card.innerHTML = `
+        <div class="feed-card-header">
+          <span class="you-label">You</span>
+          <span class="injection-label">joined the discussion</span>
+        </div>
+        <p>${escHtml(message)}</p>
+        <div class="feed-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</div>
+      `;
+      container.appendChild(card);
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      this.lastRenderedIndex += 1; // will be reconciled on next poll
+
+      input.value = '';
+      document.getElementById('inject-char-count').textContent = '0 / 500';
+      const fb = document.getElementById('inject-feedback');
+      fb.textContent = 'Sent! Agents will respond in the next round.';
+      setTimeout(() => { fb.textContent = ''; }, 3000);
+    } catch (e) {
+      const fb = document.getElementById('inject-feedback');
+      fb.style.color = 'var(--red)';
+      fb.textContent = 'Network error. Please try again.';
+      setTimeout(() => { fb.textContent = ''; fb.style.color = 'var(--green)'; }, 3000);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send';
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Utility: HTML escape
+// ---------------------------------------------------------------------------
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+App.init();
+</script>
+</body>
+</html>

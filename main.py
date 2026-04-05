@@ -33,34 +33,34 @@ if GEMINI_API_KEY:
 # ---------------------------------------------------------------------------
 MODELS = [
     {
-        "id": "gemini-2.0-flash",
+        "id": "gemini-2.5-pro-preview-05-06",
+        "display_name": "Gemini 2.5 Pro",
+        "input_price_per_million": 1.25,
+        "output_price_per_million": 10.00,
+    },
+    {
+        "id": "gemini-2.5-flash-preview-04-17",
+        "display_name": "Gemini 2.5 Flash",
+        "input_price_per_million": 0.15,
+        "output_price_per_million": 0.60,
+    },
+    {
+        "id": "gemini-2.0-flash-001",
         "display_name": "Gemini 2.0 Flash",
         "input_price_per_million": 0.10,
         "output_price_per_million": 0.40,
     },
     {
-        "id": "gemini-2.0-flash-lite",
+        "id": "gemini-2.0-flash-lite-001",
         "display_name": "Gemini 2.0 Flash-Lite",
         "input_price_per_million": 0.075,
         "output_price_per_million": 0.30,
     },
     {
-        "id": "gemini-1.5-flash",
+        "id": "gemini-1.5-flash-002",
         "display_name": "Gemini 1.5 Flash",
         "input_price_per_million": 0.075,
         "output_price_per_million": 0.30,
-    },
-    {
-        "id": "gemini-1.5-pro",
-        "display_name": "Gemini 1.5 Pro",
-        "input_price_per_million": 1.25,
-        "output_price_per_million": 5.00,
-    },
-    {
-        "id": "gemini-2.5-pro",
-        "display_name": "Gemini 2.5 Pro",
-        "input_price_per_million": 1.25,
-        "output_price_per_million": 10.00,
     },
 ]
 VALID_MODEL_IDS = {m["id"] for m in MODELS}
